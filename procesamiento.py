@@ -1,6 +1,20 @@
 import pdfplumber
 import pandas as pd
 import re
+
+def cargar_info(path):
+    df = pd.read_csv(path, sep=';',encoding='latin1')
+    file_paths = df["RUTA"].tolist()
+    equipos1 = df["EQUIPO1"].tolist()
+    equipos2 = df["EQUIPO2"].tolist()
+    return file_paths,equipos1,equipos2
+def info_test():
+    file_paths = ["FECHA1/AA ESPINHO 1 X 3 SL BENFICA.pdf","FECHA1/VC VIANA 0 X 3 SPORTING CP .pdf","FECHA1/SD CALDAS 3 X 2 VITORIA SC.pdf","FECHA1/AJ FONTE BASTARDO 3 X 0 KAIROS.pdf","FECHA1/SC ESPINHO 3 X 2 CASTELO MAIA .pdf","FECHA1/G.C SANTO TIRSO 0 X 3 AAS MAMEDE.pdf","FECHA1/ESMORIZ GC 3 X 2 LEIXOES SC.pdf"]
+    equipos1 = ["AA Espinho","VC Viana-Casa Peixoto","SC Caldas/Aki D'el Mar","AJ Fonte Bastardo","SC Espinho","G.C. Santo Tirso","Esmoriz GC"]
+    equipos2 = ["SL Benfica","Sporting CP","Vitória SC","Clube Kairós","Castelo Maia GC","AAS Mamede","Leixões SC"]
+    return file_paths,equipos1,equipos2
+def eliminar_items_con_letras(lista):
+    return [item for item in lista if not any(char.isalpha() for char in str(item))]
 def extract_text_lines(file_path):
     lines = []
     with pdfplumber.open(file_path) as pdf:
@@ -9,11 +23,9 @@ def extract_text_lines(file_path):
             if text:
                 lines.extend(text.splitlines())
     return lines
-
 def imprimir_datos(datos):
     for i in datos:
         print(i,len(i))
-
 def preprocesar_datos_jugador(linea, headers):
     # Dividir línea en valores individuales
     datos = linea.replace("( ", "(").split()
@@ -43,8 +55,6 @@ def preprocesar_datos_jugador(linea, headers):
         datos.pop(4)
 
     return datos
-
-
 def rellenar_datos(datos, headers):
     for linea in datos:
         if len(linea) != len(headers):
@@ -54,13 +64,11 @@ def rellenar_datos(datos, headers):
                 else:
                     linea.insert(4,".")
     return datos
-
 def cambiar_errOP(df1,df2):
     temp = df1["Error"]
     df1["Error"] = df2["Error"]
     df2["Error"] = temp
     return df1,df2
-
 def procesar_linea(linea):
     match = re.search(r'\b[1-5]\b(?![\.,])', linea)
     if match:
@@ -70,7 +78,6 @@ def procesar_linea(linea):
         return numero + " " + texto_restante
     else:
         return "Not found"
-    
 def procesar_info_por_set(lineas):
     resultados = [["Set","Ser", "Ata", "BK", "Error", "Tot", "Err", "Pts", "Tot", "Err", "Pos%", "(Prf%)", "Tot", "Err", "Blo", "Pts", "Pts%", "Pts"]]
     for linea in lineas:
@@ -107,7 +114,53 @@ def extraer_puntos_y_palabras_previas(linea):
             resultado.append(f"{palabras[i-2]} {palabras[i-1]} {palabras[i]}")
     
     return resultado[0],resultado[1]
-    
+def clean_string2(temp):
+    lista = temp.split(" ")
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    lista.pop(3)
+    temp = " ".join(lista)
+    return temp
+def clean_string(temp):
+    lista = temp.split(" ")
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(-1)
+    lista.pop(-1)
+    temp = " ".join(lista)
+    return temp
+def clean_string3(temp):
+    lista = temp.split(" ")
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(-1)
+    lista.pop(0)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    temp = " ".join(lista)
+    return temp
+def clean_string4(temp):
+    lista = temp.split(" ")
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(0)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    lista.pop(-1)
+    temp = " ".join(lista)
+    return temp  
 def procesar_partidos(file_path,equipo1,equipo2):
     lineas_contenido = extract_text_lines(file_path)
     match_data = lineas_contenido[0:12]
@@ -151,47 +204,69 @@ def procesar_partidos(file_path,equipo1,equipo2):
     datos2 = rellenar_datos(datos_jugadores2,equipo2_data[1])
     df1 = pd.DataFrame(datos1, columns=equipo1_data[1])
     df2 = pd.DataFrame(datos2, columns=equipo2_data[1])
+    # print("-----------------")
     # for i in lineas_contenido[break_linea:]:
     #     print(i)
-    print("-----------------")
+    # print("-----------------")
     data = lineas_contenido[break_linea:]
     rece1,rece2 = extraer_recepcion_y_palabras(data[2])
     puntos1,puntos2 = extraer_puntos_y_palabras_previas(data[3])
-    print(rece1, rece2)
-    print(puntos1,puntos2)
+    if any(char.isdigit() for char in data[10]):
+        temp1 = data[10] 
+        temp2 = data[11]
+    else:
+        temp1 = data[11]
+        temp2 = data[12]
+    if len(data[6].split(" "))<=8:
+        temp3 = clean_string(data[7])
+    else:
+        temp3 = clean_string3(data[6])
+    serve1,serve2 = extraer_recepcion_y_palabras(clean_string(temp1))
+    ace1 , ace2 = extraer_puntos_y_palabras_previas(clean_string2(clean_string(temp2)))
+    attack_positive = eliminar_items_con_letras([temp3.split(" ")])
+    attack_exclamative = eliminar_items_con_letras([clean_string4(temp2).split(" ")])
+    contra = [data[15].split(" ")]
+    headers = ["Err", "Blo", "Pts%s","Tot", "Tot", "Pts%s", "Blo", "Err"]
+    headers2 = [equipo1,equipo2]
+    temp = [[rece1,rece2],[puntos1,puntos2],[serve1,serve2],[ace1,ace2]]
+    df_positive = pd.DataFrame(attack_positive,columns=headers)
+    df_exclamative = pd.DataFrame(attack_exclamative,columns=headers)
+    df_contra = pd.DataFrame(contra,columns=headers)
+    df_metricas = pd.DataFrame(temp,columns=headers2)
 
+    print("PARTIDO "+equipo1.upper()+" v/s "+ equipo2.upper())
+    print("Partido N°"+Match_id)
+    print("Fecha: "+Match_date)
+    print("Local: "+sets_local)
+    print("Visita: "+sets_visita)
+    print("Set Total: "+str(int(sets_local)+int(sets_visita)))
+    print(df_match)
+    print("Duración total: "+ str(total_duracion))
+    print("Score Total: "+str(score_e1)+"-"+str(score_e2))
+    print("______________________________________________")
+    print("EQUIPO "+equipo1.upper())
+    print(df1)
+    print("______________________________________________")
+    print(df_data_por_set_e1)
+    print("______________________________________________")
+    print("EQUIPO "+equipo2.upper())
+    print(df2)
+    print("______________________________________________")
+    print(df_data_por_set_e2)
+    print("______________________________________________")
+    print("______________________________________________")
 
-    # print("PARTIDO "+equipo1.upper()+" v/s "+ equipo2.upper())
-    # print("Partido N°"+Match_id)
-    # print("Fecha: "+Match_date)
-    # print("Local: "+sets_local)
-    # print("Visita: "+sets_visita)
-    # print("Set Total: "+str(int(sets_local)+int(sets_visita)))
-    # print(df_match)
-    # print("Duración total: "+ str(total_duracion))
-    # print("Score Total: "+str(score_e1)+"-"+str(score_e2))
-    # print("______________________________________________")
-    # print("EQUIPO "+equipo1.upper())
-    # print(df1)
-    # print("______________________________________________")
-    # print(df_data_por_set_e1)
-    # print("______________________________________________")
-    # print("EQUIPO "+equipo2.upper())
-    # print(df2)
-    # print("______________________________________________")
-    # print(df_data_por_set_e2)
-    # print("______________________________________________")
-    # print("______________________________________________")
-    
-    
-file_paths = ["AA ESPINHO 1 X 3 SL BENFICA.pdf","VC VIANA 0 X 3 SPORTING CP .pdf","SD CALDAS 3 X 2 VITORIA SC.pdf","AJ FONTE BASTARDO 3 X 0 KAIROS.pdf","SC ESPINHO 3 X 2 CASTELO MAIA .pdf","G.C SANTO TIRSO 0 X 3 AAS MAMEDE.pdf","ESMORIZ GC 3 X 2 LEIXOES SC.pdf"]
-# Definir los nombres exactos de los equipos tal y como se muestrane en el documento.
-equipos1 = ["AA Espinho","VC Viana-Casa Peixoto","SC Caldas/Aki D'el Mar","AJ Fonte Bastardo","SC Espinho","G.C. Santo Tirso","Esmoriz GC"]
-equipos2 = ["SL Benfica","Sporting CP","Vitória SC","Clube Kairós","Castelo Maia GC","AAS Mamede","Leixões SC"]
+    print(df_metricas)
+    print("-----------------")
+    print("1° ATAQUE RECE(+#)")
+    print(df_positive)
+    print("1° ATAQUE RECE(-!)")
+    print(df_exclamative)
+    print("CONTRA ATAQUE")
+    print(df_contra)
+    print("-----------------")
 
-
-file_path = file_paths[5]
+#file_paths,equipos1,equipos2 = info_test()
+file_paths,equipos1,equipos2 = cargar_info("fecha1_pdfs.csv")
 for i in range(len(file_paths)):
     procesar_partidos(file_paths[i],equipos1[i],equipos2[i])
-
-# procesar_partidos(file_paths[0],equipos1[0],equipos2[0])
