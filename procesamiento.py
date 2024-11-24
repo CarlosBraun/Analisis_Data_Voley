@@ -1,7 +1,35 @@
 import pdfplumber
 import pandas as pd
 import re
+import os
 
+
+def agregar_columna_id(df, ID):
+    # Agregamos la nueva columna con el valor único para todas las filas
+    df.insert(0,"ID", ID)
+    # Retornamos el DataFrame actualizado
+    return df
+def agregar_columna_equipo(df, team):
+    # Agregamos la nueva columna con el valor único para todas las filas
+    df.insert(1,"Equipo", team)
+    # Retornamos el DataFrame actualizado
+    return df
+def leer_input(path):
+    ruta_actual = os.path.dirname(__file__)
+    nombre_archivo = path
+    ruta_archivo = os.path.join(ruta_actual, nombre_archivo)
+
+    try:
+        with open(ruta_archivo, "r", encoding="utf-8") as archivo:
+            contenido = archivo.read().strip()  # Remueve espacios en blanco extra
+            print("Contenido del archivo:")
+            return contenido
+    except FileNotFoundError:
+        print(f"El archivo '{nombre_archivo}' no fue encontrado en la carpeta del script.")
+        exit()
+    except Exception as e:
+        print(f"Ocurrió un error al leer el archivo: {e}")
+        exit()
 def cargar_info(path):
     df = pd.read_csv(path, sep=';',encoding='latin1')
     file_paths = df["RUTA"].tolist()
@@ -172,6 +200,7 @@ def procesar_partidos(file_path,equipo1,equipo2):
     total_sets = int(sets_local)+int(sets_visita)
     Match_id = re.search(r'\d+',match_data[linea_inicio_data_general-1]).group()
     Match_date = re.search(r'\b\d{2}/\d{2}/\d{4}\b', match_data[linea_inicio_data_general]).group()
+    match_ID = Match_date+"_"+Match_id
     match_general_data = [["Set","Duración","Parcial 8","Parcial 16","Parcial 21","Score"]]
     for linea in match_data[linea_inicio_data_general:linea_inicio_data_general+5]:
         resultado = procesar_linea(linea)
@@ -202,8 +231,8 @@ def procesar_partidos(file_path,equipo1,equipo2):
     datos1 = rellenar_datos(datos_jugadores1,equipo1_data[1])
     datos_jugadores2 = [preprocesar_datos_jugador(linea,equipo2_data[1]) for linea in equipo2_data[2:equipo2_fin+1-equipo2_linea]]
     datos2 = rellenar_datos(datos_jugadores2,equipo2_data[1])
-    df1 = pd.DataFrame(datos1, columns=equipo1_data[1])
-    df2 = pd.DataFrame(datos2, columns=equipo2_data[1])
+    df1 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos1, columns=equipo1_data[1]),match_ID),equipo1)
+    df2 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos2, columns=equipo2_data[1]),match_ID),equipo2)
     # print("-----------------")
     # for i in lineas_contenido[break_linea:]:
     #     print(i)
@@ -236,6 +265,7 @@ def procesar_partidos(file_path,equipo1,equipo2):
 
     print("PARTIDO "+equipo1.upper()+" v/s "+ equipo2.upper())
     print("Partido N°"+Match_id)
+    print("Partido ID:"+match_ID)
     print("Fecha: "+Match_date)
     print("Local: "+sets_local)
     print("Visita: "+sets_visita)
@@ -267,6 +297,7 @@ def procesar_partidos(file_path,equipo1,equipo2):
     print("-----------------")
 
 #file_paths,equipos1,equipos2 = info_test()
-file_paths,equipos1,equipos2 = cargar_info("fecha1_pdfs.csv")
+print(leer_input("ruta_csv.txt"))
+file_paths,equipos1,equipos2 = cargar_info(leer_input("ruta_csv.txt"))
 for i in range(len(file_paths)):
     procesar_partidos(file_paths[i],equipos1[i],equipos2[i])
