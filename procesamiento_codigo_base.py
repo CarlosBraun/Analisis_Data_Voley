@@ -2,72 +2,7 @@ import pdfplumber
 import pandas as pd
 import re
 import os
-from openpyxl import load_workbook
 
-def guardar_datos_en_excel(df_nuevo, archivo, hoja):
-    """
-    Guarda los datos de un DataFrame en una hoja específica de un archivo Excel.
-    
-    Si la hoja existe, agrega los datos sin sobrescribir. Si la hoja no existe, 
-    la crea y guarda los datos.
-    
-    Args:
-    - df_nuevo: DataFrame con los datos a agregar.
-    - archivo: Ruta al archivo Excel donde se guardarán los datos.
-    - hoja: Nombre de la hoja en el archivo Excel.
-    """
-    # Verificar si el archivo tiene la extensión .xlsx
-    if not archivo.endswith('.xlsx'):
-        raise ValueError(f"El archivo {archivo} no tiene la extensión .xlsx.")
-    
-    # Verificar si el archivo existe
-    if not os.path.exists(archivo):
-        raise FileNotFoundError(f"El archivo {archivo} no existe.")
-    
-    try:
-        # Intentar cargar el archivo Excel
-        libro = load_workbook(archivo)
-        
-        # Verificar si la hoja existe
-        if hoja in libro.sheetnames:
-            # Leer la hoja existente si ya existe
-            df_existente = pd.read_excel(archivo, sheet_name=hoja)
-        else:
-            # Si la hoja no existe, crear una hoja vacía
-            df_existente = pd.DataFrame()
-
-    except Exception as e:
-        raise RuntimeError(f"Error al abrir el archivo Excel: {e}")
-    
-    # Restablecer los índices de ambos DataFrames para asegurarse de que son únicos
-    df_existente = df_existente.reset_index(drop=True)
-    df_nuevo = df_nuevo.reset_index(drop=True)
-
-    # Verificar que no haya columnas duplicadas
-    df_existente = df_existente.loc[:, ~df_existente.columns.duplicated()]
-    df_nuevo = df_nuevo.loc[:, ~df_nuevo.columns.duplicated()]
-
-    # Concatenar los nuevos datos con los existentes (si hay datos previos)
-    df_actualizado = pd.concat([df_existente, df_nuevo], ignore_index=True)
-    df_actualizado = df_actualizado.drop_duplicates(keep='first')
-
-    # Guardar el DataFrame actualizado en la misma hoja
-    with pd.ExcelWriter(archivo, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
-        # Escribir el DataFrame actualizado en la hoja específica
-        df_actualizado.to_excel(writer, sheet_name=hoja, index=False)
-
-    print(f"Datos guardados exitosamente en la hoja '{hoja}' de {archivo}.")
-def extraer_numeros(texto):
-    """
-    Extrae todos los números de un string y los retorna como un string.
-
-    Args:
-    - texto: El texto de entrada.
-
-    Returns:
-    - Un string que contiene solo los números extraídos.
-    """
-    return ''.join(re.findall(r'\d+', texto))
 
 def agregar_columna_id(df, ID):
     # Agregamos la nueva columna con el valor único para todas las filas
@@ -272,9 +207,8 @@ def procesar_partidos(file_path,equipo1,equipo2):
         if resultado == "Not found":
             break
         match_general_data.append(resultado.split(" "))
-    df_match = agregar_columna_id(pd.DataFrame(match_general_data[1:], columns=match_general_data[0]),match_ID)
+    df_match = pd.DataFrame(match_general_data[1:], columns=match_general_data[0])
     df_match["Duración"] = pd.to_numeric(df_match["Duración"], errors="coerce")  # Convierte valores no válidos a NaN
-    df_match["Set"] = pd.to_numeric(df_match["Set"], errors="coerce")  # Convierte valores no válidos a NaN
     total_duracion = df_match["Duración"].sum()
     score_e1,score_e2 = calcular_score_total(df_match["Score"])
     break_line = equipo1+" "+equipo2
@@ -291,17 +225,14 @@ def procesar_partidos(file_path,equipo1,equipo2):
     datos_jugadores1 = [preprocesar_datos_jugador(linea,equipo1_data[1]) for linea in equipo1_data[2:equipo1_fin+1-equipo1_linea]]
     datos_por_set_e1 = procesar_info_por_set(equipo1_data[equipo1_fin+1-equipo1_linea:equipo1_fin-equipo1_linea+total_sets+2])
     datos_por_set_e2 = procesar_info_por_set(equipo2_data[equipo2_fin+1-equipo2_linea:equipo2_fin-equipo2_linea+total_sets+2])
-    header_2= ['Set', 'Ser', 'Ata', 'BK', 'Error', 'Tot S', 'Err S', 'Pts S', 'Tot R', 'Err R', 'Pos% R', '(Prf%) R', 'Tot A', 'Err A', 'Blo A', 'Pts A', 'Pts% A', 'Pts BK']
-    print(datos_por_set_e1[0])
-    df_data_por_set_e1 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos_por_set_e1[1:],columns=header_2),match_ID),equipo1)
-    df_data_por_set_e2 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos_por_set_e2[1:],columns=header_2),match_ID),equipo2)
+    df_data_por_set_e1 = pd.DataFrame(datos_por_set_e1[1:],columns=datos_por_set_e1[0])
+    df_data_por_set_e2 = pd.DataFrame(datos_por_set_e2[1:],columns=datos_por_set_e2[0])
     cambiar_errOP(df_data_por_set_e1,df_data_por_set_e2)
-    headers_1 = ['Numero', 'Libero', 'Apellido', 'Nombre', '1', '2', '3', '4',"5", 'Voto', 'Tot', 'BP', 'V-P', 'Tot S', 'Err S', 'Pts S', 'Tot R', 'Err R', 'Pos% R', '(Prf%) R', 'Tot A', 'Err A', 'Blo A', 'Pts A', 'Pts% A', 'Pts BK']
-    datos1 = rellenar_datos(datos_jugadores1,headers_1)
+    datos1 = rellenar_datos(datos_jugadores1,equipo1_data[1])
     datos_jugadores2 = [preprocesar_datos_jugador(linea,equipo2_data[1]) for linea in equipo2_data[2:equipo2_fin+1-equipo2_linea]]
-    datos2 = rellenar_datos(datos_jugadores2,headers_1)
-    df1 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos1, columns=headers_1),match_ID),equipo1)
-    df2 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos2, columns=headers_1),match_ID),equipo2)
+    datos2 = rellenar_datos(datos_jugadores2,equipo2_data[1])
+    df1 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos1, columns=equipo1_data[1]),match_ID),equipo1)
+    df2 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos2, columns=equipo2_data[1]),match_ID),equipo2)
     # print("-----------------")
     # for i in lineas_contenido[break_linea:]:
     #     print(i)
@@ -324,43 +255,38 @@ def procesar_partidos(file_path,equipo1,equipo2):
     attack_positive = eliminar_items_con_letras([temp3.split(" ")])
     attack_exclamative = eliminar_items_con_letras([clean_string4(temp2).split(" ")])
     contra = [data[15].split(" ")]
-    headers = ["Err1", "Blo1", "Pts%s1","Tot1", "Tot2", "Pts%s2", "Blo2", "Err2"]
-    headers2 = ["Equipo","Recepcion","Puntos SO","Servicio","Puntos BP"]
-    temp = [[equipo1,extraer_numeros(rece1),extraer_numeros(puntos1),extraer_numeros(serve1),extraer_numeros(ace1)],[equipo2,extraer_numeros(rece2),extraer_numeros(puntos2),extraer_numeros(serve2),extraer_numeros(ace2)]]
+    headers = ["Err", "Blo", "Pts%s","Tot", "Tot", "Pts%s", "Blo", "Err"]
+    headers2 = [equipo1,equipo2]
+    temp = [[rece1,rece2],[puntos1,puntos2],[serve1,serve2],[ace1,ace2]]
     df_positive = pd.DataFrame(attack_positive,columns=headers)
     df_exclamative = pd.DataFrame(attack_exclamative,columns=headers)
     df_contra = pd.DataFrame(contra,columns=headers)
-    df_metricas = agregar_columna_id(pd.DataFrame(temp,columns=headers2),match_ID)
-    headers_3 = ["ID","Equipo1","Equipo2","Numero de Partido","Fecha","Sets Local","Sets Visita","Set Total","Duración","Score Acumulado"]
-    match_info = [[match_ID,equipo1,equipo2,Match_id,Match_date,sets_local,sets_visita,str(int(sets_local)+int(sets_visita)),total_duracion,str(score_e1)+"-"+str(score_e2)]]
-    df_general = pd.DataFrame(match_info,columns=headers_3)
+    df_metricas = pd.DataFrame(temp,columns=headers2)
 
     print("PARTIDO "+equipo1.upper()+" v/s "+ equipo2.upper())
-    print(df_general)
-
+    print("Partido N°"+Match_id)
+    print("Partido ID:"+match_ID)
+    print("Fecha: "+Match_date)
+    print("Local: "+sets_local)
+    print("Visita: "+sets_visita)
+    print("Set Total: "+str(int(sets_local)+int(sets_visita)))
     print(df_match)
-    guardar_datos_en_excel(df_match,"DATOS.xlsx","Sets_General")
     print("Duración total: "+ str(total_duracion))
     print("Score Total: "+str(score_e1)+"-"+str(score_e2))
     print("______________________________________________")
     print("EQUIPO "+equipo1.upper())
     print(df1)
-    guardar_datos_en_excel(df1,"DATOS.xlsx","Jugadores")
     print("______________________________________________")
     print(df_data_por_set_e1)
-    guardar_datos_en_excel(df_data_por_set_e1,"DATOS.xlsx","Por_Set")
     print("______________________________________________")
     print("EQUIPO "+equipo2.upper())
     print(df2)
-    guardar_datos_en_excel(df2,"DATOS.xlsx","Jugadores")
     print("______________________________________________")
     print(df_data_por_set_e2)
-    guardar_datos_en_excel(df_data_por_set_e2,"DATOS.xlsx","Por_Set")
     print("______________________________________________")
     print("______________________________________________")
 
     print(df_metricas)
-    guardar_datos_en_excel(df_metricas,"DATOS.xlsx","Recepción_Servicio")
     print("-----------------")
     print("1° ATAQUE RECE(+#)")
     print(df_positive)
