@@ -2,14 +2,17 @@ import pdfplumber
 import pandas as pd
 import re
 import os
+import sys
+import time
 from openpyxl import load_workbook
+from openpyxl import Workbook
 
 def guardar_datos_en_excel(df_nuevo, archivo, hoja):
     """
     Guarda los datos de un DataFrame en una hoja específica de un archivo Excel.
     
     Si la hoja existe, agrega los datos sin sobrescribir. Si la hoja no existe, 
-    la crea y guarda los datos.
+    la crea y guarda los datos. Si el archivo no existe, lo crea y guarda los datos.
     
     Args:
     - df_nuevo: DataFrame con los datos a agregar.
@@ -20,11 +23,14 @@ def guardar_datos_en_excel(df_nuevo, archivo, hoja):
     if not archivo.endswith('.xlsx'):
         raise ValueError(f"El archivo {archivo} no tiene la extensión .xlsx.")
     
-    # Verificar si el archivo existe
-    if not os.path.exists(archivo):
-        raise FileNotFoundError(f"El archivo {archivo} no existe.")
-    
     try:
+        # Si el archivo no existe, crearlo
+        if not os.path.exists(archivo):
+            # Crear un nuevo archivo Excel si no existe
+            libro = Workbook()
+            libro.save(archivo)
+            print(f"Archivo {archivo} creado exitosamente.")
+        
         # Intentar cargar el archivo Excel
         libro = load_workbook(archivo)
         
@@ -39,24 +45,30 @@ def guardar_datos_en_excel(df_nuevo, archivo, hoja):
     except Exception as e:
         raise RuntimeError(f"Error al abrir el archivo Excel: {e}")
     
-    # Restablecer los índices de ambos DataFrames para asegurarse de que son únicos
-    df_existente = df_existente.reset_index(drop=True)
-    df_nuevo = df_nuevo.reset_index(drop=True)
-
-    # Verificar que no haya columnas duplicadas
-    df_existente = df_existente.loc[:, ~df_existente.columns.duplicated()]
-    df_nuevo = df_nuevo.loc[:, ~df_nuevo.columns.duplicated()]
-
-    # Concatenar los nuevos datos con los existentes (si hay datos previos)
-    df_actualizado = pd.concat([df_existente, df_nuevo], ignore_index=True)
-    df_actualizado = df_actualizado.drop_duplicates(keep='first')
 
     # Guardar el DataFrame actualizado en la misma hoja
     with pd.ExcelWriter(archivo, mode='a', engine='openpyxl', if_sheet_exists='replace') as writer:
+        # Borrar la hoja antes de escribir los nuevos datos
+        if hoja in libro.sheetnames:
+            std = libro[hoja]
+            libro.remove(std)
+        
         # Escribir el DataFrame actualizado en la hoja específica
-        df_actualizado.to_excel(writer, sheet_name=hoja, index=False)
-
-    print(f"Datos guardados exitosamente en la hoja '{hoja}' de {archivo}.")
+        df_nuevo.to_excel(writer, sheet_name=hoja, index=False)
+    
+    print(f"\nDatos guardados exitosamente en la hoja '{hoja}' de {archivo}.")
+def imprimir_bienvenida():
+    # Mensaje grande
+    print("\n")
+    print("***************************************")
+    print("** Data Voley Information Processing **")
+    print("**              System               **")
+    print("***************************************")
+    time.sleep(1)  # Pausa de 1 segundo para hacer la transición más agradable
+    # Mensaje más pequeño
+    print("\nBy C.Braun")
+    print("\n")
+    time.sleep(1)  # Pausa antes de continuar con el proceso
 def extraer_numeros(texto):
     """
     Extrae todos los números de un string y los retorna como un string.
@@ -68,7 +80,14 @@ def extraer_numeros(texto):
     - Un string que contiene solo los números extraídos.
     """
     return ''.join(re.findall(r'\d+', texto))
-
+def imprimir_barra_progreso(iteracion, total, longitud=40):
+    progreso = iteracion / total
+    barra = '█' * int(progreso * longitud)  # Genera una barra de progreso
+    espacios = ' ' * (longitud - len(barra))  # Rellena el espacio restante
+    porcentaje = progreso * 100  # Calcula el porcentaje
+    # Muestra la barra y el porcentaje
+    sys.stdout.write(f'\r[{barra}{espacios}] {porcentaje:.2f}%')
+    sys.stdout.flush()
 def agregar_columna_id(df, ID):
     # Agregamos la nueva columna con el valor único para todas las filas
     df.insert(0,"ID", ID)
@@ -87,7 +106,6 @@ def leer_input(path):
     try:
         with open(ruta_archivo, "r", encoding="utf-8") as archivo:
             contenido = archivo.read().strip()  # Remueve espacios en blanco extra
-            print("Contenido del archivo:")
             return contenido
     except FileNotFoundError:
         print(f"El archivo '{nombre_archivo}' no fue encontrado en la carpeta del script.")
@@ -253,8 +271,14 @@ def clean_string4(temp):
     lista.pop(-1)
     lista.pop(-1)
     temp = " ".join(lista)
-    return temp  
-def procesar_partidos(file_path,equipo1,equipo2):
+    return temp 
+def procesar_partidos_seguro(file_path, equipo1, equipo2, lista_final, final_headers):
+    try:
+        procesar_partidos(file_path, equipo1, equipo2, lista_final, final_headers)
+    except Exception as e:
+        print(f"Error procesando el archivo: {file_path}")
+        print(f"Detalles del error: {e}")
+def procesar_partidos(file_path,equipo1,equipo2,lista_final,final_headers):
     lineas_contenido = extract_text_lines(file_path)
     match_data = lineas_contenido[0:12]
     linea_inicio_data_general = next((i for i, linea in enumerate(match_data) if "Date" in linea or "Data" in linea), None)
@@ -354,14 +378,13 @@ def procesar_partidos(file_path,equipo1,equipo2):
     equipo2_datos = [Match_id,Match_date,equipo2,ganador_visita,0,sets_visita,total_duracion,score_total,float(promedio2)]
     equipo2_datos.extend(df2.iloc[-1].to_list()[-16:])
     equipo2_datos.extend([int(df_metricas["Recepcion"][1])/int(df_metricas["Puntos SO"][1]),int(df_metricas["Servicio"][1])/int(df_metricas["Puntos BP"][1])])
+    lista_final.append(equipo1_datos)
+    lista_final.append(equipo2_datos)
 
-    datos_df = [equipo1_datos,equipo2_datos]
-    df_final = pd.DataFrame(datos_df,columns=final_headers)
-
-    print("---------------------")
-    print(df_final)
-    guardar_datos_en_excel(df_final,"DATOS.xlsx","Datos")
-    print("---------------------")
+    # print("---------------------")
+    # print(df_final)
+    # guardar_datos_en_excel(df_final,"DATOS.xlsx","Datos")
+    # print("---------------------")
 
     # print("PARTIDO "+equipo1.upper()+" v/s "+ equipo2.upper())
     # print(df_general)
@@ -400,7 +423,12 @@ def procesar_partidos(file_path,equipo1,equipo2):
     # print("-----------------")
 
 #file_paths,equipos1,equipos2 = info_test()
-print(leer_input("ruta_csv.txt"))
+leer_input("ruta_csv.txt")
 file_paths,equipos1,equipos2 = cargar_info(leer_input("ruta_csv.txt"))
-for i in range(len(file_paths)):
-    procesar_partidos(file_paths[i],equipos1[i],equipos2[i])
+lista_final, final_headers = [],["Partido","Fecha","Equipo","Ganador","Local","Sets","Duracion","Resultado","Eva","Tot Puntos","BP Puntos","G-P Puntos","Tot Saque","Err Saque","Pts Saque","Tot Recepcion","Err Recepcion","Pos% Recepcion","(Exc%) Recepcion","Tot Ataque","Err Ataque","BL Ataque","Pts Ataque","Pts% Ataque", "Pts BL","Recepciones por Puntos","Saques por Break Point" ]
+total = len(file_paths)
+imprimir_bienvenida()
+for i in range(total):
+    procesar_partidos_seguro(file_paths[i],equipos1[i],equipos2[i], lista_final,final_headers)
+    imprimir_barra_progreso(i + 1, total)
+guardar_datos_en_excel(pd.DataFrame(lista_final,columns=final_headers),"DATOS.xlsx","Datos")
