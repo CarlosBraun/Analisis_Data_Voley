@@ -327,6 +327,9 @@ def procesar_partidos(file_path,equipo1,equipo2,lista_final,final_headers):
     df_data_por_set_e1 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos_por_set_e1[1:],columns=header_2),match_ID),equipo1)
     df_data_por_set_e2 = agregar_columna_equipo(agregar_columna_id(pd.DataFrame(datos_por_set_e2[1:],columns=header_2),match_ID),equipo2)
     cambiar_errOP(df_data_por_set_e1,df_data_por_set_e2)
+    error1 = df_data_por_set_e1["Error"]
+    error2 = df_data_por_set_e2["Error"]
+    #print(error1)
     headers_1 = ['Numero', 'Libero', 'Apellido', 'Nombre', '1', '2', '3', '4',"5", 'Voto', 'Tot', 'BP', 'V-P', 'Tot S', 'Err S', 'Pts S', 'Tot R', 'Err R', 'Pos% R', '(Prf%) R', 'Tot A', 'Err A', 'Blo A', 'Pts A', 'Pts% A', 'Pts BK']
     datos1 = rellenar_datos(datos_jugadores1,headers_1)
     datos_jugadores2 = [preprocesar_datos_jugador(linea,equipo2_data[1]) for linea in equipo2_data[2:equipo2_fin+1-equipo2_linea]]
@@ -352,30 +355,30 @@ def procesar_partidos(file_path,equipo1,equipo2,lista_final,final_headers):
     else:
         temp1 = data[11]
         temp2 = data[12]
-    # if len(data[6].split(" "))<=8:
-    #     temp3 = clean_string(data[7])
-    # else:
-    #     temp3 = clean_string3(data[6])
+    if len(data[6].split(" "))<=8:
+        temp3 = clean_string(data[7])
+    else:
+        temp3 = clean_string3(data[6])
     serve1,serve2 = extraer_recepcion_y_palabras(clean_string(temp1))
     ace1 , ace2 = extraer_puntos_y_palabras_previas(clean_string2(clean_string(temp2)))
-    # attack_positive = eliminar_items_con_letras([temp3.split(" ")])
-    # attack_exclamative = eliminar_items_con_letras([clean_string4(temp2).split(" ")])
-    # contra = [data[15].split(" ")]
-    # headers = ["Err1", "Blo1", "Pts%s1","Tot1", "Tot2", "Pts%s2", "Blo2", "Err2"]
+    attack_positive = eliminar_items_con_letras([temp3.split(" ")])
+    attack_exclamative = eliminar_items_con_letras([clean_string4(temp2).split(" ")])
+    contra = [data[15].split(" ")]
+    headers = ["Err1", "Blo1", "Pts%s1","Tot1", "Tot2", "Pts%s2", "Blo2", "Err2"]
     headers2 = ["Equipo","Recepcion","Puntos SO","Servicio","Puntos BP"]
     temp = [[equipo1,extraer_numeros(rece1),extraer_numeros(puntos1),extraer_numeros(serve1),extraer_numeros(ace1)],[equipo2,extraer_numeros(rece2),extraer_numeros(puntos2),extraer_numeros(serve2),extraer_numeros(ace2)]]
-    # df_positive = pd.DataFrame(attack_positive,columns=headers)
-    # df_exclamative = pd.DataFrame(attack_exclamative,columns=headers)
-    # df_contra = pd.DataFrame(contra,columns=headers)
+    df_positive = pd.DataFrame(attack_positive,columns=headers)
+    df_exclamative = pd.DataFrame(attack_exclamative,columns=headers)
+    df_contra = pd.DataFrame(contra,columns=headers)
     df_metricas = agregar_columna_id(pd.DataFrame(temp,columns=headers2),match_ID)
-    # headers_3 = ["ID","Equipo1","Equipo2","Numero de Partido","Fecha","Sets Local","Sets Visita","Set Total","Duración","Score Acumulado"]
+    headers_3 = ["ID","Equipo1","Equipo2","Numero de Partido","Fecha","Sets Local","Sets Visita","Set Total","Duración","Score Acumulado"]
     match_info = [[match_ID,equipo1,equipo2,Match_id,Match_date,sets_local,sets_visita,str(int(sets_local)+int(sets_visita)),total_duracion,str(score_e1)+"-"+str(score_e2)]]
-    # df_general = pd.DataFrame(match_info,columns=headers_3)
+    df_general = pd.DataFrame(match_info,columns=headers_3)
     final_headers = ["Partido","Fecha","Equipo","Ganador","Local","Sets","Duracion","Resultado","Eva","Tot Puntos","BP Puntos","G-P Puntos","Tot Saque","Err Saque","Pts Saque","Tot Recepcion","Err Recepcion","Pos% Recepcion","(Exc%) Recepcion","Tot Ataque","Err Ataque","BL Ataque","Pts Ataque","Pts% Ataque", "Pts BL","Recepciones por Puntos","Saques por Break Point" ]
-    equipo1_datos = [Match_id,Match_date,equipo1,ganador_local,1,sets_local,total_duracion,score_total,float(promedio1)]
+    equipo1_datos = [Match_id,Match_date,equipo1,ganador_local,1,sets_local,total_duracion,score_e1,float(promedio1)]
     equipo1_datos.extend(df1.iloc[-1].to_list()[-16:])
     equipo1_datos.extend([int(df_metricas["Recepcion"][0])/int(df_metricas["Puntos SO"][0]),int(df_metricas["Servicio"][0])/int(df_metricas["Puntos BP"][0])])
-    equipo2_datos = [Match_id,Match_date,equipo2,ganador_visita,0,sets_visita,total_duracion,score_total,float(promedio2)]
+    equipo2_datos = [Match_id,Match_date,equipo2,ganador_visita,0,sets_visita,total_duracion,score_e2,float(promedio2)]
     equipo2_datos.extend(df2.iloc[-1].to_list()[-16:])
     equipo2_datos.extend([int(df_metricas["Recepcion"][1])/int(df_metricas["Puntos SO"][1]),int(df_metricas["Servicio"][1])/int(df_metricas["Puntos BP"][1])])
     lista_final.append(equipo1_datos)
@@ -399,14 +402,14 @@ def procesar_partidos(file_path,equipo1,equipo2,lista_final,final_headers):
 
     # guardar_datos_en_excel(df1,"DATOS.xlsx","Jugadores")
     # print("______________________________________________")
-    # print(df_data_por_set_e1)
+    #print(df_data_por_set_e1)
     # guardar_datos_en_excel(df_data_por_set_e1,"DATOS.xlsx","Por_Set")
     # print("______________________________________________")
     # print("EQUIPO "+equipo2.upper())
     # print(df2)
     # guardar_datos_en_excel(df2,"DATOS.xlsx","Jugadores")
     # print("______________________________________________")
-    # print(df_data_por_set_e2)
+    #print(df_data_por_set_e2)
     # guardar_datos_en_excel(df_data_por_set_e2,"DATOS.xlsx","Por_Set")
     # print("______________________________________________")
     # print("______________________________________________")
@@ -431,4 +434,4 @@ imprimir_bienvenida()
 for i in range(total):
     procesar_partidos_seguro(file_paths[i],equipos1[i],equipos2[i], lista_final,final_headers)
     imprimir_barra_progreso(i + 1, total)
-guardar_datos_en_excel(pd.DataFrame(lista_final,columns=final_headers),"DATOS.xlsx","Datos")
+guardar_datos_en_excel(pd.DataFrame(lista_final,columns=final_headers),"DATOS.xlsx","Sheet")
